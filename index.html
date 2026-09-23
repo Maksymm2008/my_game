@@ -1,1 +1,622 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Kulturverein Experience</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
+    body, html {
+      width: 100vw; height: 100vh;
+      background-color: #050507; color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      overflow: hidden;
+    }
+
+    .hero-container {
+      position: relative; width: 100vw; height: 100vh;
+      background: linear-gradient(180deg, rgba(0,0,0,0.4) 0%, rgba(5,5,7,0.95) 100%),
+                  url('https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=1200') center/cover no-repeat;
+      display: flex; flex-direction: column; justify-content: space-between;
+      padding: 16px 12px;
+    }
+
+    .hero-nav { display: flex; justify-content: space-between; align-items: center; z-index: 10; width: 100%; gap: 6px; }
+    .brand-logo { font-size: clamp(0.7rem, 2.5vw, 0.9rem); font-weight: 800; letter-spacing: 1px; text-transform: uppercase; white-space: nowrap; }
+    .nav-links { display: flex; gap: 4px; width: 100%; justify-content: flex-end; }
+
+    .nav-item {
+      color: #fff; font-size: clamp(0.55rem, 2.2vw, 0.75rem); font-weight: 700; text-transform: uppercase;
+      padding: 7px 0; text-align: center; flex: 1; max-width: 80px;
+      background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+      border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.2); cursor: pointer; transition: all 0.2s; white-space: nowrap;
+    }
+    .nav-item:active { background: #fff; color: #000; }
+
+    /* OVERLAY MODAL */
+    .overlay {
+      position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+      background: rgba(0,0,0,0.85); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
+      z-index: 100; display: none; flex-direction: column; justify-content: center; align-items: center;
+      padding: 12px; animation: fadeIn 0.2s ease;
+    }
+    .overlay.active { display: flex; }
+
+    .modal-card {
+      background: #121216; border: 1px solid #2a2a32; border-radius: 20px;
+      padding: 16px; position: relative; width: 100%; max-width: 420px;
+      max-height: 92vh; overflow-y: auto; display: flex; flex-direction: column;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+    }
+
+    .close-btn { position: absolute; top: 12px; right: 16px; font-size: 1.5rem; color: #888; cursor: pointer; z-index: 10; }
+    h2 { font-size: 1rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+
+    /* EVENT CARD */
+    .event-card { background: #1a1a20; border: 1px solid #2a2a35; border-radius: 12px; padding: 14px; margin-bottom: 12px; }
+    .event-title { font-size: 0.95rem; font-weight: bold; margin-bottom: 6px; color: #fff; }
+    .event-info { font-size: 0.8rem; color: #aaa; margin-bottom: 10px; line-height: 1.4; }
+
+    /* BÜHNE */
+    .stage {
+      width: 100%;
+      background: linear-gradient(180deg, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0.02) 100%);
+      border-top: 3px solid #fff;
+      color: #fff; text-align: center;
+      padding: 6px; font-size: 0.65rem; font-weight: 800; letter-spacing: 3px;
+      border-radius: 6px 6px 0 0; margin-bottom: 12px; text-transform: uppercase;
+      box-shadow: 0 4px 15px rgba(255,255,255,0.15);
+    }
+
+    /* ЛЕГЕНДА СИДЕНИЙ */
+    .legend {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-bottom: 12px;
+      padding: 8px 4px; background: #181820; border-radius: 8px; font-size: 0.65rem; color: #ccc; text-align: center;
+    }
+    .legend-item { display: flex; align-items: center; justify-content: center; gap: 4px; }
+    .legend-box { width: 12px; height: 12px; border-radius: 3px; }
+    .legend-free { background: #222; border: 1px solid #444; }
+    .legend-selected { background: #28a745; border: 1px solid #28a745; }
+    .legend-mine { background: #007bff; border: 1px solid #007bff; }
+    .legend-occupied { background: #dc3545; border: 1px solid #dc3545; }
+
+    .seating-grid {
+      display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px;
+      padding: 2px; overflow-x: auto; -webkit-overflow-scrolling: touch;
+    }
+
+    .seat-row { display: flex; align-items: center; justify-content: center; gap: 4px; }
+    .row-label { font-size: 0.65rem; color: #666; width: 18px; text-align: right; margin-right: 2px; font-weight: bold; }
+
+    .seat {
+      width: 22px; height: 22px; border-radius: 5px; background: #222; border: 1px solid #444;
+      color: #fff; font-size: 0.6rem; display: flex; align-items: center; justify-content: center;
+      cursor: pointer; user-select: none; transition: all 0.15s; flex-shrink: 0;
+    }
+
+    /* ЦВЕТА СИДЕНИЙ */
+    .seat.selected { background: #28a745; color: #fff; border-color: #28a745; font-weight: bold; box-shadow: 0 0 8px rgba(40,167,69,0.5); }
+    .seat.my-seat { background: #007bff; border-color: #007bff; color: #fff; font-weight: bold; cursor: default; box-shadow: 0 0 6px rgba(0,123,255,0.4); }
+    .seat.occupied { background: #dc3545; border-color: #dc3545; color: #777; cursor: not-allowed; opacity: 0.5; }
+
+    .info-banner {
+      background: rgba(0, 123, 255, 0.15); border: 1px solid rgba(0, 123, 255, 0.4);
+      color: #64b5f6; font-size: 0.75rem; padding: 8px 12px; border-radius: 8px; margin-bottom: 10px;
+    }
+
+    /* СТИЛИ ИМЕНИ: ПЛАШКА ВМЕСТО ПОЛЯ */
+    .locked-name-badge {
+      background: #1a1a20; border: 1px solid #2a2a35; padding: 12px; border-radius: 10px;
+      margin-bottom: 12px; display: flex; align-items: center; gap: 10px;
+    }
+    .locked-name-icon { font-size: 1.2rem; }
+    .locked-name-value { color: #fff; font-weight: bold; font-size: 0.95rem; margin-top: 2px; }
+
+    input[type="text"] {
+      width: 100%; padding: 12px; border-radius: 10px; border: 1px solid #333;
+      background: #09090c; color: #fff; margin-bottom: 12px; font-size: 0.9rem; outline: none;
+      -webkit-appearance: none;
+    }
+    input[type="text"]:focus { border-color: #28a745; }
+
+    .btn-action {
+      width: 100%; padding: 14px; border: none; border-radius: 10px;
+      background: #fff; color: #000; font-weight: bold; text-transform: uppercase;
+      font-size: 0.75rem; letter-spacing: 1px; cursor: pointer; margin-top: 10px;
+    }
+    .btn-action:disabled { background: #444; color: #888; cursor: not-allowed; }
+    .btn-action:active:not(:disabled) { background: #ccc; }
+
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    /* --- TEAM KARTEN & SLIDER CSS --- */
+    .team-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding-bottom: 10px; }
+    .team-card { background: #1a1a20; border-radius: 12px; padding: 12px; text-align: center; cursor: pointer; border: 1px solid #2a2a32; transition: transform 0.2s; }
+    .team-card:active { transform: scale(0.95); }
+    .team-img-small { width: 60px; height: 60px; border-radius: 50%; object-fit: cover; margin-bottom: 8px; border: 2px solid #4dabf7; }
+    .team-name { font-size: 0.85rem; font-weight: bold; }
+    .team-role { font-size: 0.7rem; color: #888; }
+
+    .team-detail { display: flex; flex-direction: column; align-items: center; width: 100%; }
+    .back-btn { font-size: 0.85rem; color: #4dabf7; cursor: pointer; margin-bottom: 15px; align-self: flex-start; display: flex; align-items: center; gap: 5px; }
+
+    .carousel-container {
+      width: 100%; max-width: 250px; aspect-ratio: 1/1; overflow: hidden;
+      position: relative; border-radius: 15px; border: 3px solid #4dabf7; margin-bottom: 12px;
+    }
+    .carousel-track { display: flex; height: 100%; width: 100%; transition: transform 0.4s ease-in-out; }
+    .carousel-slide { min-width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+
+    .carousel-dots { display: flex; justify-content: center; gap: 6px; margin-bottom: 15px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #444; cursor: pointer; transition: 0.3s; }
+    .dot.active { background: #4dabf7; }
+
+    .team-detail-bio { font-size: 0.85rem; color: #ccc; line-height: 1.5; text-align: left; background: #1a1a20; padding: 12px; border-radius: 10px; width: 100%; border: 1px solid #2a2a32; }
+
+    /* --- GALERIE CSS --- */
+    .gallery-grid {
+      display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;
+      margin-top: 15px; padding-bottom: 20px;
+    }
+    .gallery-img {
+      width: 100%; aspect-ratio: 1 / 1; object-fit: cover; border-radius: 10px;
+      cursor: pointer; border: 1px solid #2a2a32; transition: transform 0.2s;
+    }
+    .gallery-img:active { transform: scale(0.95); }
+
+    /* --- LIGHTBOX (Vollbild-Bildbetrachter) --- */
+    .lightbox {
+      position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+      background: rgba(0, 0, 0, 0.95); z-index: 200;
+      display: none; justify-content: center; align-items: center;
+      opacity: 0; transition: opacity 0.3s ease;
+    }
+    .lightbox.active { display: flex; opacity: 1; }
+    .lightbox img {
+      max-width: 95%; max-height: 90%; border-radius: 8px;
+      box-shadow: 0 0 20px rgba(0,0,0,0.8); object-fit: contain;
+    }
+    .lightbox-close {
+      position: absolute; top: 20px; right: 20px;
+      color: #fff; font-size: 2.5rem; cursor: pointer;
+      width: 40px; height: 40px; display: flex; justify-content: center; align-items: center;
+      background: rgba(255,255,255,0.1); border-radius: 50%;
+    }
+
+    /* --- FAQ & CONTACT CSS --- */
+    .faq-item { margin-bottom: 10px; background: #1a1a20; padding: 12px; border-radius: 10px; border: 1px solid #2a2a32; }
+    .faq-q { font-weight: bold; font-size: 0.85rem; color: #4dabf7; margin-bottom: 4px; }
+    .faq-a { font-size: 0.8rem; color: #ccc; line-height: 1.4; }
+
+    .contact-box {
+      background: rgba(77, 171, 247, 0.08); border: 1px solid rgba(77, 171, 247, 0.3);
+      padding: 14px; border-radius: 12px; margin-top: 16px; text-align: center;
+    }
+    .contact-title { font-size: 0.9rem; font-weight: bold; color: #fff; margin-bottom: 6px; }
+    .contact-desc { font-size: 0.78rem; color: #aaa; margin-bottom: 10px; line-height: 1.4; }
+  </style>
+</head>
+<body>
+
+  <div class="hero-container">
+    <div class="hero-nav">
+      <div class="brand-logo">KULTURVEREIN</div>
+      <div class="nav-links">
+        <span class="nav-item" onclick="openModal('events')">Events</span>
+        <span class="nav-item" onclick="openModal('galerie')">Galerie</span>
+        <span class="nav-item" onclick="openModal('team')">Team</span>
+        <span class="nav-item" onclick="openModal('info')">Info</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="popup">
+    <div class="modal-card">
+      <span class="close-btn" onclick="closeModal()">×</span>
+      <div id="modal-content"></div>
+    </div>
+  </div>
+
+  <div class="lightbox" id="lightbox" onclick="closeLightbox()">
+    <span class="lightbox-close">×</span>
+    <img id="lightbox-img" src="">
+  </div>
+
+  <script>
+    const tg = window.Telegram.WebApp;
+    tg.expand();
+
+    // Парсим параметры из URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const occupiedSeatsParam = urlParams.get('occupied') || '';
+    const mySeatsParam = urlParams.get('my_seats') || '';
+    const maxAllowedSeats = parseInt(urlParams.get('max_seats') || '4', 10);
+    const bookedNameParam = urlParams.get('name') || '';
+
+    const occupiedSeats = occupiedSeatsParam ? occupiedSeatsParam.split(',') : [];
+    const mySeats = mySeatsParam ? mySeatsParam.split(',') : [];
+
+    let selectedSeats = [];
+
+    const eventsList = [
+      {
+        id: "kulturabend_2026",
+        title: "Kulturabend 2026",
+        date: "Samstag, 19:00 Uhr",
+        location: "Hauptaula im Vereinsheim"
+      }
+    ];
+
+    const galleryImages = [
+      "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800",
+      "https://images.unsplash.com/photo-1493225457124-a1a2a4af4048?w=800",
+      "https://images.unsplash.com/photo-1540039155733-d76e614860c6?w=800",
+      "https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?w=800",
+      "https://images.unsplash.com/photo-1470229722913-7c090be5bc12?w=800",
+      "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=800"
+    ];
+
+    const teamMembers = [
+      { id: 1, name: "Natali", role: "Vorstand & Orga", imgs: ["https://i.pravatar.cc/300?img=47", "https://i.pravatar.cc/300?img=48"], bio: "Natali ist das Herz des Kulturvereins. Sie plant die Events, koordiniert das Team und sorgt dafür, dass jeder Abend unvergesslich wird." },
+      { id: 2, name: "Volodymyr", role: "Künstlerische Leitung", imgs: ["https://i.pravatar.cc/300?img=11", "https://i.pravatar.cc/300?img=12", "https://i.pravatar.cc/300?img=13"], bio: "Volodymyr ist für das kreative Programm verantwortlich. Von der Musikauswahl bis zur Bühnengestaltung bringt er Kunst zum Leben." },
+      { id: 3, name: "Anna", role: "Event Management", imgs: ["https://i.pravatar.cc/300?img=41", "https://i.pravatar.cc/300?img=42"], bio: "Anna sorgt für einen reibungslosen Ablauf vor Ort. Sie empfängt die Gäste und koordiniert den Einlass." },
+      { id: 4, name: "Max", role: "Technik & IT", imgs: ["https://i.pravatar.cc/300?img=53"], bio: "Ohne Max läuft nichts: Licht, Ton und das Buchungssystem liegen in seinen Händen. Er löst jedes technische Problem." },
+      { id: 5, name: "Julia", role: "Social Media", imgs: ["https://i.pravatar.cc/300?img=32", "https://i.pravatar.cc/300?img=33"], bio: "Julia hält unsere Community auf Instagram und Facebook auf dem Laufenden und fängt die besten Momente fotografisch ein." }
+    ];
+
+    const faqList = [
+      {
+        q: "Wie viele Plätze kann ich reservieren?",
+        a: "Jeder Benutzer kann insgesamt bis zu 4 Plätze für die Veranstaltung reservieren."
+      },
+      {
+        q: "Wie erhalte ich mein Ticket?",
+        a: "Sobald deine Reservierung vom Administrator bestätigt wird, erhältst du deinen QR-Code-Ticket direkt hier im Telegram-Chat."
+      },
+      {
+        q: "Kann ich meine Reservierung stornieren?",
+        a: "Ja, klicke dazu einfach im Telegram-Chat unten auf den Button '❌ Reservierung stornieren'."
+      },
+      {
+        q: "Wo findet das Event statt?",
+        a: "Alle Details zum Ort und Datum der Veranstaltung findest du unter der Rubrik 'Events'."
+      }
+    ];
+
+    let currentSlideIndex = 0;
+    let autoSlideInterval;
+    let touchStartX = 0;
+    let touchEndX = 0;
+
+    function openModal(type) {
+      tg.HapticFeedback.impactOccurred('medium');
+      const popup = document.getElementById('popup');
+      const content = document.getElementById('modal-content');
+
+      clearInterval(autoSlideInterval);
+
+      if(type === 'events') {
+        let html = `<h2>Anstehende Events</h2>`;
+        eventsList.forEach(event => {
+          html += `
+            <div class="event-card">
+              <div class="event-title">${event.title}</div>
+              <div class="event-info">📅 ${event.date} | 📍 ${event.location}</div>
+              <button class="btn-action" onclick="openSeatingPlan('${event.title}')">Sitzplätze Auswählen</button>
+            </div>
+          `;
+        });
+        content.innerHTML = html;
+
+      } else if(type === 'galerie') {
+        let gridHtml = '<div class="gallery-grid">';
+        galleryImages.forEach(img => {
+          gridHtml += `<img src="${img}" class="gallery-img" onclick="openLightbox('${img}')">`;
+        });
+        gridHtml += '</div>';
+        content.innerHTML = `
+          <h2>Galerie</h2>
+          <p style="color:#aaa; font-size:0.85rem;">Eindrücke unserer Events.</p>
+          ${gridHtml}
+        `;
+
+      } else if(type === 'team') {
+        let gridHtml = '<div class="team-grid">';
+        teamMembers.forEach(m => {
+          gridHtml += `
+            <div class="team-card" onclick="showTeamMember(${m.id})">
+              <img src="${m.imgs[0]}" class="team-img-small">
+              <div class="team-name">${m.name}</div>
+              <div class="team-role">${m.role}</div>
+            </div>`;
+        });
+        gridHtml += '</div>';
+        content.innerHTML = `<h2>Unser Team</h2>${gridHtml}`;
+
+      } else if(type === 'info') {
+        let faqHtml = '';
+        faqList.forEach(item => {
+          faqHtml += `
+            <div class="faq-item">
+              <div class="faq-q">❓ ${item.q}</div>
+              <div class="faq-a">${item.a}</div>
+            </div>
+          `;
+        });
+
+        content.innerHTML = `
+          <h2>Info & FAQ</h2>
+          <div style="margin-top:10px;">${faqHtml}</div>
+
+          <div class="contact-box">
+            <div class="contact-title">💬 Fragen oder Hilfe nötig?</div>
+            <div class="contact-desc">Klicke unten, um uns direkt eine Nachricht im Telegram-Chat zu schreiben. Wir antworten dir так schnell wie möglich!</div>
+            <button class="btn-action" style="background:#4dabf7; color:#fff;" onclick="contactAdmin()">Frage an Admin senden</button>
+          </div>
+        `;
+      }
+
+      popup.classList.add('active');
+    }
+
+    function contactAdmin() {
+      tg.HapticFeedback.impactOccurred('medium');
+      tg.close();
+    }
+
+    function openLightbox(imgSrc) {
+      tg.HapticFeedback.impactOccurred('light');
+      const lightbox = document.getElementById('lightbox');
+      const lightboxImg = document.getElementById('lightbox-img');
+      lightboxImg.src = imgSrc;
+      lightbox.style.display = 'flex';
+      setTimeout(() => lightbox.classList.add('active'), 10);
+    }
+
+    function closeLightbox() {
+      const lightbox = document.getElementById('lightbox');
+      lightbox.classList.remove('active');
+      setTimeout(() => lightbox.style.display = 'none', 300);
+    }
+
+    function showTeamMember(id) {
+      tg.HapticFeedback.selectionChanged();
+      clearInterval(autoSlideInterval);
+      currentSlideIndex = 0;
+      const member = teamMembers.find(m => m.id === id);
+      const content = document.getElementById('modal-content');
+
+      let slidesHtml = '';
+      let dotsHtml = '';
+
+      member.imgs.forEach((imgUrl, index) => {
+        slidesHtml += `<img src="${imgUrl}" class="carousel-slide">`;
+        dotsHtml += `<div class="dot ${index === 0 ? 'active' : ''}" onclick="setSlide(${index}, ${member.imgs.length})"></div>`;
+      });
+
+      content.innerHTML = `
+        <div class="back-btn" onclick="openModal('team')">⬅ Zurück</div>
+        <div class="team-detail">
+          <h2>${member.name}</h2>
+          <div style="color:#4dabf7; font-size:0.85rem; margin-bottom:12px;">${member.role}</div>
+
+          <div class="carousel-container"
+               ontouchstart="handleTouchStart(event)"
+               ontouchend="handleTouchEnd(event, ${member.imgs.length})">
+            <div class="carousel-track" id="carousel-track">
+              ${slidesHtml}
+            </div>
+          </div>
+
+          <div class="carousel-dots" id="carousel-dots">
+            ${member.imgs.length > 1 ? dotsHtml : ''}
+          </div>
+
+          <div class="team-detail-bio">${member.bio}</div>
+        </div>
+      `;
+
+      if (member.imgs.length > 1) {
+        autoSlideInterval = setInterval(() => moveSlide(1, member.imgs.length), 3000);
+      }
+    }
+
+    function moveSlide(direction, totalSlides) {
+      if(totalSlides <= 1) return;
+      currentSlideIndex = (currentSlideIndex + direction + totalSlides) % totalSlides;
+      updateCarousel(totalSlides);
+    }
+
+    function setSlide(index, totalSlides) {
+      currentSlideIndex = index;
+      updateCarousel(totalSlides);
+      clearInterval(autoSlideInterval);
+      autoSlideInterval = setInterval(() => moveSlide(1, totalSlides), 3000);
+    }
+
+    function updateCarousel(totalSlides) {
+      const track = document.getElementById('carousel-track');
+      const dots = document.getElementById('carousel-dots').children;
+      if (track) track.style.transform = `translateX(-${currentSlideIndex * 100}%)`;
+
+      for(let i = 0; i < dots.length; i++) {
+        dots[i].classList.remove('active');
+      }
+      if(dots[currentSlideIndex]) dots[currentSlideIndex].classList.add('active');
+    }
+
+    function handleTouchStart(e) { touchStartX = e.changedTouches[0].screenX; }
+
+    function handleTouchEnd(e, totalSlides) {
+      touchEndX = e.changedTouches[0].screenX;
+      clearInterval(autoSlideInterval);
+      if (touchStartX - touchEndX > 40) moveSlide(1, totalSlides);
+      if (touchEndX - touchStartX > 40) moveSlide(-1, totalSlides);
+      autoSlideInterval = setInterval(() => moveSlide(1, totalSlides), 3000);
+    }
+
+    function openSeatingPlan(eventTitle) {
+      tg.HapticFeedback.impactOccurred('light');
+      selectedSeats = [];
+      const content = document.getElementById('modal-content');
+
+      const telegramUserName = (tg.initDataUnsafe && tg.initDataUnsafe.user)
+        ? `${tg.initDataUnsafe.user.first_name || ''} ${tg.initDataUnsafe.user.last_name || ''}`.trim()
+        : '';
+
+      const displayName = bookedNameParam || telegramUserName;
+      const isReturningUser = mySeats.length > 0;
+
+      let legendHtml = `
+        <div class="legend">
+          <div class="legend-item"><div class="legend-box legend-free"></div> Frei</div>
+          <div class="legend-item"><div class="legend-box legend-selected"></div> Gewählt</div>
+          <div class="legend-item"><div class="legend-box legend-mine"></div> Deine</div>
+          <div class="legend-item"><div class="legend-box legend-occupied"></div> Besetzt</div>
+        </div>
+      `;
+
+      let gridHtml = `<div class="stage">LEINWAND / BÜHNE</div>${legendHtml}<div class="seating-grid">`;
+
+      for (let r = 1; r <= 8; r++) {
+        gridHtml += `<div class="seat-row"><span class="row-label">R${r}</span>`;
+        for (let s = 1; s <= 10; s++) {
+          const seatId = `R${r}-S${s}`;
+          const isMine = mySeats.includes(seatId);
+          const isOccupied = occupiedSeats.includes(seatId);
+
+          if (isMine) {
+            gridHtml += `<div class="seat my-seat" id="seat-${seatId}" title="Dein Platz">✓</div>`;
+          } else if (isOccupied) {
+            gridHtml += `<div class="seat occupied" id="seat-${seatId}">✕</div>`;
+          } else {
+            gridHtml += `<div class="seat" id="seat-${seatId}" onclick="toggleSeat('${seatId}')">${s}</div>`;
+          }
+        }
+        gridHtml += `</div>`;
+      }
+      gridHtml += `</div>`;
+
+      let bannerHtml = '';
+      if (isReturningUser) {
+        bannerHtml = `<div class="info-banner">🔹 Bereits von dir gebucht: <b>${mySeats.join(', ')}</b> (${mySeats.length}/4)</div>`;
+      }
+
+      // ЛОГИКА ОТОБРАЖЕНИЯ ИМЕНИ
+      let nameFieldHtml = '';
+      if (isReturningUser) {
+        const savedName = displayName || "Bereits registriert";
+        nameFieldHtml = `
+          <div class="locked-name-badge">
+            <div class="locked-name-icon">👤</div>
+            <div>
+              <div class="locked-name-value">${savedName}</div>
+            </div>
+          </div>
+          <input type="hidden" id="fullname" value="${savedName}">
+        `;
+      } else {
+        nameFieldHtml = `<input type="text" id="fullname" placeholder="Vollständiger Name" value="${displayName}">`;
+      }
+
+      let btnDisabledAttr = maxAllowedSeats <= 0 ? 'disabled' : '';
+      let btnText = maxAllowedSeats <= 0 ? 'Maximum (4) erreicht' : '0 Stühle ausgewählt – Reservieren';
+
+      content.innerHTML = `
+        <h2>Platzwahl</h2>
+        <p style="color:#888; font-size:0.75rem; margin-bottom:8px;">Event: <b>${eventTitle}</b></p>
+        ${bannerHtml}
+        ${gridHtml}
+        <input type="hidden" id="event_name" value="${eventTitle}">
+
+        ${nameFieldHtml}
+
+        <button class="btn-action" id="submit-booking-btn" ${btnDisabledAttr} onclick="sendBooking()">
+          <span id="seat-count-text">${btnText}</span>
+        </button>
+      `;
+
+      setTimeout(() => {
+        const modal = document.querySelector('.modal-card');
+        if(modal) modal.scrollTop = modal.scrollHeight;
+      }, 100);
+    }
+
+    function toggleSeat(seatId) {
+      if (maxAllowedSeats <= 0) {
+        tg.HapticFeedback.notificationOccurred('warning');
+        if (tg.showAlert) tg.showAlert("Du hast bereits das Maximum von 4 Plätzen gebucht!");
+        return;
+      }
+
+      tg.HapticFeedback.selectionChanged();
+      const seatEl = document.getElementById(`seat-${seatId}`);
+
+      if (selectedSeats.includes(seatId)) {
+        selectedSeats = selectedSeats.filter(id => id !== seatId);
+        seatEl.classList.remove('selected');
+      } else {
+        if (selectedSeats.length >= maxAllowedSeats) {
+          tg.HapticFeedback.notificationOccurred('warning');
+          const msg = `Du kannst maximal noch ${maxAllowedSeats} weiteren/weitere Platz/Plätze auswählen!`;
+          if (tg.showAlert) tg.showAlert(msg);
+          else alert(msg);
+          return;
+        }
+        selectedSeats.push(seatId);
+        seatEl.classList.add('selected');
+      }
+
+      document.getElementById('seat-count-text').innerText = `${selectedSeats.length} Stuhl/Stühle ausgewählt – Reservieren`;
+    }
+
+    function closeModal() {
+      document.getElementById('popup').classList.remove('active');
+      clearInterval(autoSlideInterval);
+    }
+
+    function sendBooking() {
+  try {
+    const nameInput = document.getElementById('fullname');
+    const name = nameInput ? nameInput.value.trim() : "";
+    const eventName = document.getElementById('event_name') ? document.getElementById('event_name').value : "Event";
+
+    // Безопасное получение ID пользователя
+    const user = (tg.initDataUnsafe && tg.initDataUnsafe.user) ? tg.initDataUnsafe.user : null;
+    const userId = user ? user.id : "Unbekannt";
+
+    if (!name && mySeats.length === 0) {
+      if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
+      if (tg.showAlert) tg.showAlert('Bitte gib deinen Namen ein!');
+      else alert('Bitte gib deinen Namen ein!');
+      return;
+    }
+
+    if (selectedSeats.length === 0) {
+      if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
+      if (tg.showAlert) tg.showAlert('Bitte wähle mindestens 1 Stuhl aus!');
+      else alert('Bitte wähle mindestens 1 Stuhl aus!');
+      return;
+    }
+
+    if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+
+    // Отправляем данные в Telegram (Telegram САМ закроет окно!)
+    tg.sendData(JSON.stringify({
+      telegram_id: userId,
+      event: eventName,
+      name: name,
+      seats: selectedSeats
+    }));
+
+    // НЕ ВЫЗЫВАЕМ tg.close() здесь!
+
+  } catch (err) {
+    alert("Fehler beim Senden: " + err.message);
+  }
+}
+  </script>
+</body>
+</html>
